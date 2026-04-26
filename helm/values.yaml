@@ -1,0 +1,76 @@
+replicaCount: 1
+
+image:
+  repository: docker.io/frenoid/yunikorn-mcp-server
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+resources: {}
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# YuniKorn MCP Server configuration
+yunikorn:
+  # Example 
+  baseUrl: "" # Example http://localhost:9089/ws/v1/
+  tlsInsecure: false # Set to true to skip TLS verification when connecting to YuniKorn
+
+# Additional command line arguments for the YuniKorn MCP Server
+# e.g.:
+# args:
+#   - "--transport=streamable-http" Take stdio or streamable-http (default: streamable-http)
+#   - "--host=0.0.0.0"
+#   - "--port=8000"
+#   - "--log-level=debug"
+args: []
