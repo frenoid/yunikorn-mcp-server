@@ -1,6 +1,7 @@
 # YuniKorn MCP Server
 
 A Model Context Protocol (MCP) server that interfaces with the Apache YuniKorn Scheduler, allowing AI agents to observe and reason about Kubernetes batch workload resource management, queue hierarchies, and application states.
+![get_partition_queues in MCP inspector](images/yunikorn-mcp-inspector.png "Yunikorn MCP Server")
 
 ## Features
 
