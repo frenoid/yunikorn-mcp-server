@@ -31,11 +31,16 @@ uv pip install -r requirements.txt
 
 The default transport is **Streamable HTTP** on port 8000:
 
+#### Run locally
 ```bash
 uv run python -m main
 ```
+#### Run with Docker
+```bash
+docker run -p 8000:8000 -eYUNIKORN_BASE_URL="http://<REPLACE_ME>/ws/v1" docker.io/frenoid/yunikorn-mcp-server:0.1.0
+```
 
-Command-line options:
+#### Command line options
 
 | Option | Description | Default |
 |--------|-------------|---------|
