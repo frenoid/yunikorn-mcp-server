@@ -44,7 +44,7 @@ uv run python -m main
 ```
 #### Run with Docker
 ```bash
-docker run -p 8000:8000 -eYUNIKORN_BASE_URL="http://<REPLACE_ME>/ws/v1" docker.io/frenoid/yunikorn-mcp-server:0.1.0
+docker run -p 8000:8000 -e YUNIKORN_BASE_URL="http://<REPLACE_ME>/ws/v1" docker.io/frenoid/yunikorn-mcp-server:0.1.0
 ```
 
 #### Command line options
@@ -106,7 +106,7 @@ YUNIKORN_BASE_URL=http://your-yunikorn-host:9089/ws/v1/ uv run python test_updat
 ### Data Format Notes
 
 - **Memory**: Represented in raw bytes (64-bit signed integers).
-- **CPU (vcore)**: Represented in millicores (thousands of a core).
+- **CPU (vcore)**: Represented in millicores (thousandths of a core, i.e. 1000m = 1 core).
 - **Other resources**: No specific unit assigned.
 - **Active applications**: The virtual "active" state represents New, Accepted, Running, Completing, and Failing statuses.
 - **allocationID vs uuid**: `uuid` is deprecated. `allocationID` contains the same base value as `uuid` with a hyphen-counter suffix (e.g., `-0`, `-1`).
@@ -123,7 +123,7 @@ This MCP server conforms to the [Apache YuniKorn Scheduler REST API](https://yun
 | `get_applications_by_state` | `GET /ws/v1/partition/{partitionName}/applications/{state}?status={status}` |
 | `inspect_application` | `GET /ws/v1/partition/{partitionName}/application/{appId}` |
 | `get_node_details` | `GET /ws/v1/partition/{partitionName}/nodes` or `/node/{nodeId}` |
-| `get_user_usage` | `GET /ws/v1/partition/{partitionName}/usage/users` or `/user/{userName}` |
+| `get_user_usage` | `GET /ws/v1/partition/{partitionName}/usage/users` or `/usage/user/{userName}` |
 | `check_scheduler_health` | `GET /ws/v1/scheduler/healthcheck` |
 
 **Resources:**
