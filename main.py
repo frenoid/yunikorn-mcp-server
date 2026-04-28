@@ -78,13 +78,19 @@ def _run_streamable_http_with_cors() -> None:
 
     app.settings.transport_security.enable_dns_rebinding_protection = False
     starlette_app = app.streamable_http_app()
+    # CORS spec forbids `Access-Control-Allow-Origin: *` together with
+    # `Access-Control-Allow-Credentials: true` — browsers reject the response.
+    # Allow operators to override origins via env var; default to wildcard
+    # without credentials (matches the original public-API intent).
+    allowed_origins = [o.strip() for o in os.environ.get("CORS_ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+    allow_credentials = allowed_origins != ["*"]
     starlette_app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["mcp-session-id"],
-        allow_credentials=True,
+        allow_credentials=allow_credentials,
     )
 
     config = uvicorn.Config(

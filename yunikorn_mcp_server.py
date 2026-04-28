@@ -22,6 +22,14 @@ DEFAULT_BASE_URL = "http://localhost:9089/ws/v1/"
 YUNIKORN_BASE_URL = os.environ.get("YUNIKORN_BASE_URL", DEFAULT_BASE_URL).rstrip("/") + "/"
 TLS_INSECURE = os.environ.get("TLS_INSECURE", "false").lower() in ("true", "1", "yes", "on")
 
+# Allowed values for the get_applications_by_state tool. Validating these
+# up-front gives a clear MCP INVALID_REQUEST instead of an opaque 404 from
+# YuniKorn when a caller passes a typo or wrong casing.
+VALID_APPLICATION_STATES = {"active", "rejected", "completed"}
+VALID_APPLICATION_STATUSES = {
+    "new", "accepted", "running", "completing", "failing",
+}
+
 
 class YunikornClient:
     """Async HTTP client for the YuniKorn REST API."""
@@ -61,7 +69,17 @@ class YunikornClient:
                 )
             )
 
-        response.raise_for_status()
+        elif response.is_error:
+            # Catches 401, 403, 405, 408, 429, etc. that the explicit branches
+            # above do not handle. Without this, httpx raises HTTPStatusError
+            # which surfaces to the MCP client as an unwrapped exception.
+            raise McpError(
+                ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=f"YuniKorn returned HTTP {response.status_code} for {path}",
+                    data=content,
+                )
+            )
         return response.json()
 
     async def close(self):
@@ -120,12 +138,30 @@ async def get_applications_by_state(
     partitionName: str, state: str, status: str | None = None
 ) -> str:
     """Get applications filtered by state."""
+    state_normalized = state.lower()
+    if state_normalized not in VALID_APPLICATION_STATES:
+        raise McpError(
+            ErrorData(
+                code=INVALID_REQUEST,
+                message=f"Invalid state '{state}'. Must be one of: {sorted(VALID_APPLICATION_STATES)}",
+            )
+        )
     partition = quote(partitionName, safe="")
-    state = quote(state, safe="")
     params = {}
-    if state == "active":
-        params["status"] = status.lower() if status else "running"
-    data = await client.get(f"partition/{partition}/applications/{state}", params=params)
+    if state_normalized == "active":
+        status_normalized = status.lower() if status else "running"
+        if status_normalized not in VALID_APPLICATION_STATUSES:
+            raise McpError(
+                ErrorData(
+                    code=INVALID_REQUEST,
+                    message=f"Invalid status '{status}'. Must be one of: {sorted(VALID_APPLICATION_STATUSES)}",
+                )
+            )
+        params["status"] = status_normalized
+    data = await client.get(
+        f"partition/{partition}/applications/{quote(state_normalized, safe='')}",
+        params=params,
+    )
     return json.dumps(data, indent=2)
 
 
