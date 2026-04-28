@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: docker.io/frenoid/yunikorn-mcp-server
   pullPolicy: IfNotPresent
-  tag: "0.1.0"
+  tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""

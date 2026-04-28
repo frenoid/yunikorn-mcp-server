@@ -3,10 +3,10 @@
 A Model Context Protocol (MCP) server that interfaces with the Apache YuniKorn Scheduler, allowing AI agents to observe and reason about Kubernetes batch workload resource management, queue hierarchies, and application states.
 
 ## Screenshots
-Inspecting Yunikorn tools using [MCP inspector]()
+Inspecting Yunikorn tools using [MCP inspector](https://modelcontextprotocol.io/docs/tools/inspector)
 ![get_partition_queues in MCP inspector](images/yunikorn-mcp-inspector.png "Yunikorn MCP Server")
 
-Querying the Yunikorn scheduler via MCP using Opencode
+Querying the Yunikorn scheduler via MCP using [Opencode](https://opencode.ai/)
 ![Querying Yunikorn scheduler information in Opencode](images/yunikorn-mcp-in-opencode.png "MCP in Opencode")
 
 ## Features
@@ -44,7 +44,7 @@ uv run python -m main
 ```
 #### Run with Docker
 ```bash
-docker run -p 8000:8000 -e YUNIKORN_BASE_URL="http://<REPLACE_ME>/ws/v1" docker.io/frenoid/yunikorn-mcp-server:0.1.0
+docker run -p 8000:8000 -e YUNIKORN_BASE_URL="http://<REPLACE_ME>/ws/v1" docker.io/frenoid/yunikorn-mcp-server:latest
 ```
 
 #### Command line options
