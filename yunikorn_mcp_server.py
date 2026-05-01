@@ -9,6 +9,7 @@ hierarchies, and application states.
 
 import os
 import json
+import ssl
 from urllib.parse import quote
 from typing import Any
 
@@ -22,6 +23,14 @@ DEFAULT_BASE_URL = "http://localhost:9089/ws/v1/"
 YUNIKORN_BASE_URL = os.environ.get("YUNIKORN_BASE_URL", DEFAULT_BASE_URL).rstrip("/") + "/"
 TLS_INSECURE = os.environ.get("TLS_INSECURE", "false").lower() in ("true", "1", "yes", "on")
 
+# Authentication — read at import time; override via YunikornClient constructor in tests.
+# Priority: bearer token > basic auth > none. mTLS is orthogonal and can combine with either.
+YUNIKORN_TOKEN = os.environ.get("YUNIKORN_TOKEN")
+YUNIKORN_USERNAME = os.environ.get("YUNIKORN_USERNAME")
+YUNIKORN_PASSWORD = os.environ.get("YUNIKORN_PASSWORD")
+YUNIKORN_CERT_PATH = os.environ.get("YUNIKORN_CERT_PATH")
+YUNIKORN_KEY_PATH = os.environ.get("YUNIKORN_KEY_PATH")
+
 # Allowed values for the get_applications_by_state tool. Validating these
 # up-front gives a clear MCP INVALID_REQUEST instead of an opaque 404 from
 # YuniKorn when a caller passes a typo or wrong casing.
@@ -34,10 +43,52 @@ VALID_APPLICATION_STATUSES = {
 class YunikornClient:
     """Async HTTP client for the YuniKorn REST API."""
 
-    def __init__(self, base_url: str = YUNIKORN_BASE_URL, verify: bool = not TLS_INSECURE):
+    def __init__(
+        self,
+        base_url: str = YUNIKORN_BASE_URL,
+        verify: bool = not TLS_INSECURE,
+        token: str | None = YUNIKORN_TOKEN,
+        username: str | None = YUNIKORN_USERNAME,
+        password: str | None = YUNIKORN_PASSWORD,
+        cert_path: str | None = YUNIKORN_CERT_PATH,
+        key_path: str | None = YUNIKORN_KEY_PATH,
+    ):
         self.base_url = base_url
         self.verify = verify
-        self.client = httpx.AsyncClient(base_url=base_url, timeout=30.0, verify=verify)
+
+        headers: dict[str, str] = {}
+        auth: tuple[str, str] | None = None
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+            self.auth_method = "bearer_token"
+        elif username and password:
+            auth = (username, password)
+            self.auth_method = "basic_auth"
+        else:
+            self.auth_method = "none"
+
+        self.mtls_enabled = bool(cert_path and key_path)
+
+        # Build the SSL context so we can optionally load a client certificate.
+        # Using an explicit ssl.SSLContext avoids the deprecated cert= kwarg in httpx.
+        ssl_context: ssl.SSLContext | bool
+        if self.mtls_enabled:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            if not verify:
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+            assert cert_path and key_path  # already checked above
+            ssl_context.load_cert_chain(cert_path, key_path)
+        else:
+            ssl_context = verify  # True / False / existing SSLContext
+
+        self.client = httpx.AsyncClient(
+            base_url=base_url,
+            timeout=30.0,
+            verify=ssl_context,
+            headers=headers,
+            auth=auth,
+        )
 
     async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Perform a GET request and return parsed JSON."""

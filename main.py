@@ -57,6 +57,15 @@ def main() -> None:
     else:
         logger.info("TLS certificate verification is ENABLED")
 
+    if client.auth_method == "bearer_token":
+        logger.info("Authentication: Bearer token (YUNIKORN_TOKEN)")
+    elif client.auth_method == "basic_auth":
+        logger.info("Authentication: Basic auth (YUNIKORN_USERNAME=%s)", os.environ.get("YUNIKORN_USERNAME", ""))
+    else:
+        logger.info("Authentication: None")
+    if client.mtls_enabled:
+        logger.info("mTLS: Client certificate enabled (%s)", os.environ.get("YUNIKORN_CERT_PATH", ""))
+
     if args.transport == "streamable-http":
         app.settings.host = args.host
         app.settings.port = args.port

@@ -18,6 +18,7 @@ Querying the Yunikorn scheduler via MCP using [Opencode](https://opencode.ai/)
 - **Resource Awareness**: Handles YuniKorn's raw bytes and millicore values
 - **CORS Enabled**: Allows connections from any origin for browser-based MCP Inspector
 - **Streamable HTTP**: Default transport with stdio fallback for IDE integration
+- **Authentication**: Optional bearer token, HTTP Basic auth, and mTLS client certificates — no auth required by default
 
 ## Installation
 
@@ -68,17 +69,67 @@ uv run python -m main --transport stdio
 
 ### Environment Variables
 
+#### Connection
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `YUNIKORN_BASE_URL` | Base URL of the YuniKorn REST API | `http://localhost:9089/ws/v1/` |
 | `TLS_INSECURE` | Disable HTTPS certificate verification (`true`/`false`) | `false` |
 
+#### Authentication
+
+Authentication is optional. If none of the variables below are set, the server connects without credentials (the original default behaviour).
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `YUNIKORN_TOKEN` | Bearer token — takes priority over Basic auth when both are set | *(none)* |
+| `YUNIKORN_USERNAME` | Username for HTTP Basic auth | *(none)* |
+| `YUNIKORN_PASSWORD` | Password for HTTP Basic auth | *(none)* |
+| `YUNIKORN_CERT_PATH` | Path to client certificate file for mTLS | *(none)* |
+| `YUNIKORN_KEY_PATH` | Path to client private key file for mTLS | *(none)* |
+
+Auth priority (first match wins):
+
+```
+YUNIKORN_TOKEN set?                  → Bearer token
+YUNIKORN_USERNAME + PASSWORD set?    → HTTP Basic auth
+Neither set?                         → No auth (plain requests)
+
+YUNIKORN_CERT_PATH + KEY_PATH set?   → mTLS (independent of the above)
+```
+
+The active auth method is logged at startup:
+
+```
+Authentication: None
+Authentication: Bearer token (YUNIKORN_TOKEN)
+Authentication: Basic auth (YUNIKORN_USERNAME=admin)
+```
+
+#### CORS
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins | `*` |
+
 ```bash
 # Connect to a remote YuniKorn instance
 YUNIKORN_BASE_URL=http://yunikorn.example.com:9089/ws/v1/ uv run python -m main
 
-# Connect to an HTTPS endpoint with a self-signed certificate
+# HTTPS with a self-signed certificate
 YUNIKORN_BASE_URL=https://yunikorn.example.com:9089/ws/v1/ TLS_INSECURE=true uv run python -m main
+
+# Bearer token authentication
+YUNIKORN_TOKEN=eyJhbGc... uv run python -m main
+
+# HTTP Basic auth
+YUNIKORN_USERNAME=admin YUNIKORN_PASSWORD=secret uv run python -m main
+
+# mTLS client certificate
+YUNIKORN_CERT_PATH=/path/to/client.crt YUNIKORN_KEY_PATH=/path/to/client.key uv run python -m main
+
+# mTLS combined with bearer token
+YUNIKORN_TOKEN=eyJhbGc... YUNIKORN_CERT_PATH=/path/to/client.crt YUNIKORN_KEY_PATH=/path/to/client.key uv run python -m main
 ```
 
 ### Connecting with MCP Inspector
@@ -91,13 +142,24 @@ http://localhost:8000/mcp
 
 ## Testing
 
-Run the test suite against a live YuniKorn instance:
+### Offline unit tests (no YuniKorn instance needed)
+
+Covers HTTP error mapping, input validation, network error propagation, and auth configuration:
+
+```bash
+uv pip install -e ".[dev]"
+pytest test_error_paths.py -v
+```
+
+### Integration tests (requires a live YuniKorn instance)
+
+Run the full test suite against a real cluster:
 
 ```bash
 YUNIKORN_BASE_URL=http://your-yunikorn-host:9089/ws/v1/ uv run python test_server.py
 ```
 
-To run a quick compliance check:
+Quick compliance check for the `get_applications_by_state` optional `status` parameter:
 
 ```bash
 YUNIKORN_BASE_URL=http://your-yunikorn-host:9089/ws/v1/ uv run python test_updated_server.py
@@ -135,8 +197,14 @@ This MCP server conforms to the [Apache YuniKorn Scheduler REST API](https://yun
 
 ## Error Mapping
 
-| YuniKorn HTTP Code | MCP Error |
-|--------------------|-----------|
-| `400 Bad Request` | `INVALID_REQUEST` |
-| `404 Not Found` | `INVALID_REQUEST` |
-| `500 Internal Server Error` | `INTERNAL_ERROR` |
+| YuniKorn HTTP Code | MCP Error | Notes |
+|--------------------|-----------|-------|
+| `400 Bad Request` | `INVALID_REQUEST` | Invalid parameter or malformed query |
+| `404 Not Found` | `INVALID_REQUEST` | Partition, queue, app, or node does not exist |
+| `500+ Internal Server Error` | `INTERNAL_ERROR` | Scheduler-side failure |
+| `401 Unauthorized` | `INTERNAL_ERROR` | Check authentication configuration |
+| `403 Forbidden` | `INTERNAL_ERROR` | Credentials lack required permissions |
+| `429 Too Many Requests` | `INTERNAL_ERROR` | YuniKorn rate limit reached |
+| Other 4xx / 5xx | `INTERNAL_ERROR` | HTTP status code included in the error message |
+
+Input validation errors (invalid `state` or `status` values) are caught before the HTTP call and returned as `INVALID_REQUEST` immediately.
